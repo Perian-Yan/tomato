@@ -28,30 +28,19 @@ python3 tomato.py
 
 ## 形成桌面应用
 
-创建桌面启动文件：
+项目已经包含 `pomodoro.desktop`。注册到应用菜单并复制到桌面：
 
-nano ~/.local/share/applications/pomodoro.desktop
-
-写入:
-```
-[Desktop Entry]
-Name=Ubuntu Pomodoro
-Comment=Pomodoro Timer App
-Exec=python3 /path/to/tomato.py
-Icon=/path/to/tomato/assets/pomodoro.svg
-Terminal=false
-Type=Application
-Categories=Utility;
-```
-
-保存后执行:
 ```bash
+mkdir -p ~/.local/share/applications ~/Desktop
+cp pomodoro.desktop ~/.local/share/applications/
+cp pomodoro.desktop ~/Desktop/
 chmod +x ~/.local/share/applications/pomodoro.desktop
+chmod +x ~/Desktop/pomodoro.desktop
+gio set ~/Desktop/pomodoro.desktop metadata::trusted true
 update-desktop-database ~/.local/share/applications
 ```
 
-在Ubuntu应用菜单里搜索：
-Ubuntu Pomodoro
+现在可以从桌面双击图标，也可以在 Ubuntu 应用菜单中搜索“番茄钟”。
 
 
 

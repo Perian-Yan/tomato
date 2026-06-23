@@ -1,0 +1,15 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=番茄钟
+Name[en]=Pomodoro Timer
+Comment=专注与休息计时器
+Comment[en]=Focus and break timer
+Exec=/usr/bin/python3 /home/perian/tomato/tomato.py
+Path=/home/perian/tomato
+Icon=/home/perian/tomato/assets/pomodoro.svg
+Terminal=false
+Categories=Utility;Clock;
+Keywords=Pomodoro;Timer;Focus;番茄钟;计时器;
+StartupNotify=true
+X-GNOME-UsesNotifications=true
