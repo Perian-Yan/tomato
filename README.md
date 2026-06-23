@@ -38,7 +38,7 @@ nano ~/.local/share/applications/pomodoro.desktop
 Name=Ubuntu Pomodoro
 Comment=Pomodoro Timer App
 Exec=python3 /path/to/tomato.py
-Icon=appointment-soon
+Icon=/path/to/tomato/assets/pomodoro.svg
 Terminal=false
 Type=Application
 Categories=Utility;
@@ -57,6 +57,6 @@ Ubuntu Pomodoro
 
 ## TODO
 - 自动统计专注时长，支持数据导出，分析个人专注力
+- 中文/英文显示（根据系统切换语言）
 - 改进 UI
-- 加系统托盘
 - 打包成 .deb 或者 AppImage

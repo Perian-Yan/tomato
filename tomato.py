@@ -28,8 +28,9 @@ from enum import Enum, auto
 from pathlib import Path
 
 from PyQt5.QtCore import Qt, QTimer, QUrl
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import (
+    QAction,
     QApplication,
     QWidget,
     QLabel,
@@ -45,7 +46,12 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QLineEdit,
+    QMenu,
+    QSystemTrayIcon,
 )
+
+BASE_DIR = Path(__file__).resolve().parent
+ICON_PATH = BASE_DIR / "assets" / "pomodoro.svg"
 
 
 class TimerMode(Enum):
@@ -63,6 +69,8 @@ class PomodoroApp(QWidget):
         super().__init__()
 
         self.setWindowTitle("Ubuntu 番茄钟")
+        self.app_icon = QIcon(str(ICON_PATH))
+        self.setWindowIcon(self.app_icon)
         self.resize(620, 520)
 
         self.mode = TimerMode.COUNTDOWN
@@ -74,8 +82,9 @@ class PomodoroApp(QWidget):
         self.remaining_seconds = self.focus_total_seconds
         self.elapsed_seconds = 0
 
-        BASE_DIR = Path(__file__).resolve().parent
         self.music_path: str | None = str(BASE_DIR / "music" / "稻香-周杰伦.mp3")
+        self.allow_close = False
+        self.tray_icon: QSystemTrayIcon | None = None
 
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
@@ -84,10 +93,67 @@ class PomodoroApp(QWidget):
         self.music_process: subprocess.Popen | None = None
 
         self.build_ui()
+        self.create_tray_icon()
         self.connect_signals()
         self.sync_focus_inputs_from_seconds(self.focus_total_seconds)
         self.sync_break_inputs_from_seconds(self.break_total_seconds)
         self.update_display()
+
+    def create_tray_icon(self) -> None:
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+
+        self.tray_icon = QSystemTrayIcon(self.app_icon, self)
+        self.tray_icon.setToolTip("番茄钟 · 专注时间")
+
+        tray_menu = QMenu(self)
+        self.show_action = QAction("隐藏窗口", self)
+        self.timer_action = QAction("开始", self)
+        reset_action = QAction("重置", self)
+        quit_action = QAction("退出番茄钟", self)
+
+        self.show_action.triggered.connect(self.toggle_window)
+        self.timer_action.triggered.connect(self.toggle_timer)
+        reset_action.triggered.connect(self.reset_timer)
+        quit_action.triggered.connect(self.quit_application)
+
+        tray_menu.addAction(self.show_action)
+        tray_menu.addSeparator()
+        tray_menu.addAction(self.timer_action)
+        tray_menu.addAction(reset_action)
+        tray_menu.addSeparator()
+        tray_menu.addAction(quit_action)
+
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self.on_tray_activated)
+        self.tray_icon.show()
+
+    def toggle_window(self) -> None:
+        if self.isVisible():
+            self.hide()
+        else:
+            self.showNormal()
+            self.activateWindow()
+            self.raise_()
+        self.update_tray_actions()
+
+    def on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+            self.toggle_window()
+
+    def toggle_timer(self) -> None:
+        if self.is_running:
+            self.pause_timer()
+        else:
+            self.start_timer()
+
+    def quit_application(self) -> None:
+        self.allow_close = True
+        self.stop_music()
+        self.timer.stop()
+        if self.tray_icon:
+            self.tray_icon.hide()
+        QApplication.quit()
 
     # ---------------- UI ----------------
     def build_ui(self) -> None:
@@ -357,6 +423,18 @@ class PomodoroApp(QWidget):
     def update_buttons(self) -> None:
         self.start_btn.setEnabled(not self.is_running)
         self.pause_btn.setEnabled(self.is_running)
+        self.update_tray_actions()
+
+    def update_tray_actions(self) -> None:
+        if not self.tray_icon:
+            return
+
+        phase = "专注" if self.phase == Phase.FOCUS else "休息"
+        shown_seconds = self.remaining_seconds if self.mode == TimerMode.COUNTDOWN else self.elapsed_seconds
+        state = "进行中" if self.is_running else "已暂停"
+        self.tray_icon.setToolTip(f"番茄钟 · {phase} {self.format_seconds(shown_seconds)} · {state}")
+        self.show_action.setText("隐藏窗口" if self.isVisible() else "显示窗口")
+        self.timer_action.setText("暂停" if self.is_running else "开始")
 
     # ---------------- Music ----------------
     def choose_music(self) -> None:
@@ -396,12 +474,26 @@ class PomodoroApp(QWidget):
         self.music_process = None
 
     def closeEvent(self, event) -> None:
+        if self.tray_icon and self.tray_icon.isVisible() and not self.allow_close:
+            event.ignore()
+            self.hide()
+            self.update_tray_actions()
+            self.tray_icon.showMessage(
+                "番茄钟仍在运行",
+                "窗口已隐藏到系统托盘，右键托盘图标可退出。",
+                QSystemTrayIcon.Information,
+                2500,
+            )
+            return
+
         self.stop_music()
         self.timer.stop()
         event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setApplicationName("Ubuntu Pomodoro")
+    app.setWindowIcon(QIcon(str(ICON_PATH)))
     window = PomodoroApp()
     window.show()
     sys.exit(app.exec_())

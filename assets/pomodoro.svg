@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="番茄钟">
+  <defs>
+    <linearGradient id="tomato" x1="58" y1="58" x2="192" y2="210" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff665b"/>
+      <stop offset="1" stop-color="#e63232"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 叶冠：右侧叶片同时形成“开始”箭头 -->
+  <path d="M128 62C104 42 79 43 65 51c17 4 29 13 37 27-21-7-40-3-53 8 22 1 40 8 52 21h54c11-14 29-22 53-23-13-11-31-15-51-8 9-14 21-23 38-28-17-8-42-5-67 14Z"
+        fill="#2f9e62" stroke="#174d3a" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M142 67l54-28-19 42 31 3-50 29Z"
+        fill="#55bd70" stroke="#174d3a" stroke-width="9" stroke-linejoin="round"/>
+
+  <!-- 番茄也是钟面 -->
+  <path d="M128 68c58 0 99 37 99 88 0 55-43 88-99 88s-99-33-99-88c0-51 41-88 99-88Z"
+        fill="url(#tomato)" stroke="#76272d" stroke-width="11" stroke-linejoin="round"/>
+
+  <!-- 大尺寸高光在缩小时仍保持简洁 -->
+  <path d="M67 142c6-25 23-43 47-50" fill="none" stroke="#ff9184" stroke-width="11"
+        stroke-linecap="round" opacity=".72"/>
+
+  <!-- 四个清晰钟点 -->
+  <g fill="#7b292d">
+    <rect x="122" y="83" width="12" height="20" rx="6"/>
+    <rect x="122" y="211" width="12" height="20" rx="6"/>
+    <rect x="43" y="151" width="20" height="12" rx="6"/>
+    <rect x="193" y="151" width="20" height="12" rx="6"/>
+  </g>
+
+  <!-- 10:10 指针，像专注时举起的双臂 -->
+  <path d="M128 158l-35-38M128 158l39-42" fill="none" stroke="#fff2d1" stroke-width="14"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="128" cy="158" r="13" fill="#fff2d1" stroke="#76272d" stroke-width="7"/>
+</svg>
