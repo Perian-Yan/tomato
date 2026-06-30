@@ -22,12 +22,14 @@ Why mpv for music:
     Calling mpv is usually more reliable for mp3/wav/ogg/flac playback.
 """
 
+import csv
 import sys
 import subprocess
+from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
 
-from PyQt5.QtCore import Qt, QTimer, QUrl
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import (
     QAction,
@@ -52,6 +54,9 @@ from PyQt5.QtWidgets import (
 
 BASE_DIR = Path(__file__).resolve().parent
 ICON_PATH = BASE_DIR / "assets" / "pomodoro.svg"
+DATA_DIR = BASE_DIR / "data"
+FOCUS_LOG_PATH = DATA_DIR / "focus_sessions.csv"
+WEEKDAYS_CN = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
 
 
 class TimerMode(Enum):
@@ -114,7 +119,7 @@ class PomodoroApp(QWidget):
 
         self.show_action.triggered.connect(self.toggle_window)
         self.timer_action.triggered.connect(self.toggle_timer)
-        reset_action.triggered.connect(self.reset_timer)
+        reset_action.triggered.connect(lambda: self.reset_timer())
         quit_action.triggered.connect(self.quit_application)
 
         tray_menu.addAction(self.show_action)
@@ -274,8 +279,8 @@ class PomodoroApp(QWidget):
     def connect_signals(self) -> None:
         self.start_btn.clicked.connect(self.start_timer)
         self.pause_btn.clicked.connect(self.pause_timer)
-        self.reset_btn.clicked.connect(self.reset_timer)
-        self.skip_btn.clicked.connect(self.finish_current_phase)
+        self.reset_btn.clicked.connect(lambda: self.reset_timer())
+        self.skip_btn.clicked.connect(lambda: self.finish_current_phase("skipped"))
 
         self.countdown_radio.toggled.connect(self.on_mode_changed)
         self.countup_radio.toggled.connect(self.on_mode_changed)
@@ -348,7 +353,7 @@ class PomodoroApp(QWidget):
 
     def on_mode_changed(self) -> None:
         self.mode = TimerMode.COUNTDOWN if self.countdown_radio.isChecked() else TimerMode.COUNTUP
-        self.reset_timer()
+        self.reset_timer(save_trigger=None)
 
     def start_timer(self) -> None:
         if self.mode == TimerMode.COUNTDOWN and self.current_phase_total_seconds() <= 0:
@@ -364,8 +369,10 @@ class PomodoroApp(QWidget):
         self.timer.stop()
         self.update_buttons()
 
-    def reset_timer(self) -> None:
+    def reset_timer(self, save_trigger: str | None = "reset") -> None:
         self.pause_timer()
+        if save_trigger:
+            self.maybe_save_focus_session(save_trigger)
         self.phase = Phase.FOCUS
         self.remaining_seconds = self.focus_total_seconds
         self.elapsed_seconds = 0
@@ -381,18 +388,19 @@ class PomodoroApp(QWidget):
             if self.remaining_seconds <= 0:
                 self.remaining_seconds = 0
                 self.update_display()
-                self.finish_current_phase()
+                self.finish_current_phase("completed")
                 return
         else:
             self.elapsed_seconds += 1
 
         self.update_display()
 
-    def finish_current_phase(self) -> None:
+    def finish_current_phase(self, save_trigger: str = "completed") -> None:
         self.pause_timer()
         self.play_music()
 
         if self.phase == Phase.FOCUS:
+            self.maybe_save_focus_session(save_trigger)
             QMessageBox.information(self, "专注结束", "专注时间结束，自动进入休息时间。")
             self.phase = Phase.BREAK
             self.remaining_seconds = self.break_total_seconds
@@ -435,6 +443,61 @@ class PomodoroApp(QWidget):
         self.tray_icon.setToolTip(f"番茄钟 · {phase} {self.format_seconds(shown_seconds)} · {state}")
         self.show_action.setText("隐藏窗口" if self.isVisible() else "显示窗口")
         self.timer_action.setText("暂停" if self.is_running else "开始")
+
+    # ---------------- Focus log ----------------
+    def current_focus_duration_seconds(self) -> int:
+        if self.phase != Phase.FOCUS:
+            return 0
+
+        if self.mode == TimerMode.COUNTDOWN:
+            return max(0, self.focus_total_seconds - self.remaining_seconds)
+        return max(0, self.elapsed_seconds)
+
+    def maybe_save_focus_session(self, trigger: str) -> None:
+        duration_seconds = self.current_focus_duration_seconds()
+        if duration_seconds <= 0:
+            return
+
+        duration_text = self.format_seconds(duration_seconds)
+        answer = QMessageBox.question(
+            self,
+            "保存本次专注吗？",
+            f"本次专注时长：{duration_text}\n\n是否保存到专注统计记录？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if answer == QMessageBox.Yes:
+            self.save_focus_session(duration_seconds, trigger)
+
+    def save_focus_session(self, duration_seconds: int, trigger: str) -> None:
+        ended_at = datetime.now().astimezone()
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+        file_exists = FOCUS_LOG_PATH.exists()
+        with FOCUS_LOG_PATH.open("a", newline="", encoding="utf-8") as log_file:
+            fieldnames = [
+                "ended_at",
+                "date",
+                "weekday",
+                "duration_seconds",
+                "duration_minutes",
+                "mode",
+                "trigger",
+            ]
+            writer = csv.DictWriter(log_file, fieldnames=fieldnames)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(
+                {
+                    "ended_at": ended_at.isoformat(timespec="seconds"),
+                    "date": ended_at.date().isoformat(),
+                    "weekday": WEEKDAYS_CN[ended_at.weekday()],
+                    "duration_seconds": duration_seconds,
+                    "duration_minutes": f"{duration_seconds / 60:.2f}",
+                    "mode": "倒计时" if self.mode == TimerMode.COUNTDOWN else "正向计时",
+                    "trigger": trigger,
+                }
+            )
 
     # ---------------- Music ----------------
     def choose_music(self) -> None:
